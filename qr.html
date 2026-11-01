@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL to QR Code Generator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QRCode.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* CSS animations & smooth rendering */
+        .qr-canvas-container canvas, .qr-canvas-container img {
+            margin: 0 auto;
+            border-radius: 0.5rem;
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-150%] opacity-0 transition-all duration-300 ease-in-out flex items-center gap-3 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-slate-700/50">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toast-message" class="text-sm font-medium">通知メッセージ</span>
+    </div>
+
+    <!-- Header Section -->
+    <header class="w-full bg-white border-b border-slate-200/80 sticky top-0 z-10 backdrop-blur-md bg-white/90">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                    <i class="fa-solid fa-qrcode text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 leading-tight">QuickQR</h1>
+                    <p class="text-xs text-slate-500 hidden sm:block">URL to QR Code Generator</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="#how-to" class="text-xs font-medium text-slate-600 hover:text-brand-600 transition px-3 py-1.5 rounded-lg hover:bg-slate-100">
+                    <i class="fa-regular fa-circle-question mr-1"></i>使い方
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div class="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
+            <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-2">
+                URLをスマホで読み込めるQRコードに変換
+            </h2>
+            <p class="text-slate-600 text-sm sm:text-base">
+                WebサイトのURLを入力するだけで、スマホのカメラですぐに開ける高精度なQRコードを無料・一瞬で作成します。
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Left Side: Input & Settings Form -->
+            <div class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 transition-all">
+                <form id="qr-form" onsubmit="return false;" class="space-y-6">
+                    <!-- URL Input Group -->
+                    <div>
+                        <label for="url-input" class="block text-sm font-semibold text-slate-800 mb-2">
+                            対象のURL <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-link"></i>
+                            </div>
+                            <input 
+                                type="url" 
+                                id="url-input" 
+                                placeholder="https://example.com" 
+                                required
+                                class="w-full pl-10 pr-24 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm sm:text-base placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 focus:bg-white transition-all shadow-inner"
+                            >
+                            <button 
+                                type="button" 
+                                id="paste-btn"
+                                class="absolute right-2 top-2 bottom-2 px-3 bg-white text-xs font-semibold text-slate-600 hover:text-brand-600 border border-slate-200 hover:border-brand-200 rounded-lg shadow-sm transition-all flex items-center gap-1 hover:bg-slate-50"
+                                title="クリップボードから貼り付け"
+                            >
+                                <i class="fa-regular fa-clipboard"></i> 貼り付け
+                            </button>
+                        </div>
+                        <p id="url-error" class="text-xs text-rose-500 mt-1.5 hidden flex items-center gap-1">
+                            <i class="fa-solid fa-circle-exclamation"></i> 有効なURL（http:// または https://）を入力してください
+                        </p>
+                    </div>
+
+                    <!-- Preset Samples -->
+                    <div>
+                        <span class="text-xs font-medium text-slate-500 block mb-2">サンプルURLで試す:</span>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="preset-btn text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition" data-url="https://www.google.com">Google</button>
+                            <button type="button" class="preset-btn text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition" data-url="https://youtube.com">YouTube</button>
+                            <button type="button" class="preset-btn text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition" data-url="https://github.com">GitHub</button>
+                            <button type="button" class="preset-btn text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition" data-url="https://wikipedia.org">Wikipedia</button>
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-100">
+
+                    <!-- Custom Options Accordion/Settings -->
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">カスタマイズ設定</h3>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- QR Code Color -->
+                            <div>
+                                <label for="color-dark" class="block text-xs font-medium text-slate-700 mb-1.5">
+                                    QRコードの色
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="color-dark" value="#000000" class="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer p-0.5 bg-white">
+                                    <input type="text" id="color-dark-hex" value="#000000" class="flex-1 py-2 px-3 border border-slate-300 rounded-lg text-xs font-mono uppercase bg-slate-50">
+                                </div>
+                            </div>
+
+                            <!-- Background Color -->
+                            <div>
+                                <label for="color-light" class="block text-xs font-medium text-slate-700 mb-1.5">
+                                    背景色
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="color-light" value="#ffffff" class="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer p-0.5 bg-white">
+                                    <input type="text" id="color-light-hex" value="#FFFFFF" class="flex-1 py-2 px-3 border border-slate-300 rounded-lg text-xs font-mono uppercase bg-slate-50">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Central Icon Customization Section -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
+                            <label class="block text-xs font-semibold text-slate-800">
+                                中央アイコンの設定
+                            </label>
+                            
+                            <!-- Preset Icon Selector -->
+                            <div>
+                                <span class="text-[11px] text-slate-500 block mb-1.5">プリセットアイコン:</span>
+                                <div class="flex flex-wrap gap-2" id="preset-icons-container">
+                                    <button type="button" class="icon-preset-btn active px-2.5 py-1.5 bg-white border border-brand-500 text-brand-600 rounded-lg text-xs flex items-center gap-1 shadow-sm font-medium" data-icon="none">
+                                        なし
+                                    </button>
+                                    <button type="button" class="icon-preset-btn px-2.5 py-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-lg text-xs flex items-center gap-1" data-icon="globe">
+                                        <i class="fa-solid fa-globe"></i> Web
+                                    </button>
+                                    <button type="button" class="icon-preset-btn px-2.5 py-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-lg text-xs flex items-center gap-1" data-icon="mobile">
+                                        <i class="fa-solid fa-mobile-screen-button"></i> スマホ
+                                    </button>
+                                    <button type="button" class="icon-preset-btn px-2.5 py-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-lg text-xs flex items-center gap-1" data-icon="heart">
+                                        <i class="fa-solid fa-heart text-rose-500"></i> ハート
+                                    </button>
+                                    <button type="button" class="icon-preset-btn px-2.5 py-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-lg text-xs flex items-center gap-1" data-icon="star">
+                                        <i class="fa-solid fa-star text-amber-500"></i> スター
+                                    </button>
+                                    <button type="button" class="icon-preset-btn px-2.5 py-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 rounded-lg text-xs flex items-center gap-1" data-icon="link">
+                                        <i class="fa-solid fa-link"></i> リンク
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Custom File Upload -->
+                            <div>
+                                <span class="text-[11px] text-slate-500 block mb-1">オリジナルのロゴ/画像を選択:</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="file" id="icon-file-input" accept="image/*" class="hidden">
+                                    <button type="button" id="upload-icon-btn" class="px-3 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                                        <i class="fa-solid fa-upload text-slate-500"></i> 画像を選択...
+                                    </button>
+                                    <span id="uploaded-filename" class="text-xs text-slate-500 truncate max-w-[150px]">ファイル未選択</span>
+                                    <button type="button" id="remove-icon-btn" class="hidden text-xs text-rose-500 hover:text-rose-700 p-1" title="削除">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Icon Size Slider -->
+                            <div id="icon-size-wrapper" class="hidden pt-1">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label for="icon-size-range" class="text-[11px] font-medium text-slate-600">アイコンサイズ:</label>
+                                    <span id="icon-size-val" class="text-[11px] font-mono text-slate-500">20%</span>
+                                </div>
+                                <input type="range" id="icon-size-range" min="12" max="28" value="20" class="w-full accent-brand-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer">
+                            </div>
+                        </div>
+
+                        <!-- Size Selector -->
+                        <div>
+                            <label for="qr-size" class="block text-xs font-medium text-slate-700 mb-1.5">
+                                解像度 (画質)
+                            </label>
+                            <select id="qr-size" class="w-full py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-700 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <option value="180">標準 (180x180px)</option>
+                                <option value="300" selected>高画質 (300x300px)</option>
+                                <option value="500">超高画質 (500x500px)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="pt-2 flex flex-col sm:flex-row gap-3">
+                        <button 
+                            type="button" 
+                            id="generate-btn"
+                            class="flex-1 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-semibold py-3.5 px-6 rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 text-base"
+                        >
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> QRコードを生成する
+                        </button>
+                        <button 
+                            type="button" 
+                            id="clear-btn"
+                            class="sm:w-auto px-4 py-3.5 border border-slate-300 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition font-medium text-sm flex items-center justify-center gap-1.5"
+                        >
+                            <i class="fa-solid fa-rotate-left"></i> リセット
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right Side: QR Code Display Area -->
+            <div class="lg:col-span-5 flex flex-col gap-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 flex flex-col items-center justify-center text-center min-h-[380px] relative">
+                    
+                    <!-- Placeholder State -->
+                    <div id="qr-placeholder" class="flex flex-col items-center justify-center py-10">
+                        <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 mb-4 animate-pulse">
+                            <i class="fa-solid fa-qrcode text-4xl"></i>
+                        </div>
+                        <p class="text-slate-500 font-medium text-sm mb-1">URLを入力して生成ボタンを押してください</p>
+                        <p class="text-xs text-slate-400">ここに生成されたQRコードが表示されます</p>
+                    </div>
+
+                    <!-- Active Result State -->
+                    <div id="qr-result" class="hidden flex-col items-center w-full">
+                        <div class="relative group p-4 rounded-2xl bg-slate-50 border border-slate-100 shadow-inner mb-6">
+                            <!-- Hidden QRCode.js element container -->
+                            <div id="qrcode-raw-container" class="hidden"></div>
+                            <!-- Combined Canvas with Centered Icon -->
+                            <canvas id="qr-final-canvas" class="rounded-xl shadow-sm border border-slate-200/60 max-w-full h-auto"></canvas>
+                        </div>
+
+                        <!-- Target URL Preview -->
+                        <div class="w-full bg-slate-50 rounded-xl p-3 border border-slate-200/70 mb-6 flex items-center justify-between gap-2">
+                            <div class="truncate text-left">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">ターゲットURL</span>
+                                <span id="target-url-display" class="text-xs text-slate-700 font-mono truncate block">https://example.com</span>
+                            </div>
+                            <button id="copy-url-btn" class="text-slate-400 hover:text-brand-600 p-2 rounded-lg transition" title="URLをコピー">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+
+                        <!-- Download & Action Buttons -->
+                        <div class="w-full grid grid-cols-1 gap-3">
+                            <button 
+                                id="download-btn"
+                                class="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 text-sm"
+                            >
+                                <i class="fa-solid fa-download"></i> 画像として保存 (PNG)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Guidance Info Card -->
+                <div id="how-to" class="bg-slate-100/70 rounded-2xl p-5 border border-slate-200/60">
+                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-lightbulb text-amber-500"></i> スマホでの読み込み手順
+                    </h4>
+                    <ol class="text-xs text-slate-600 space-y-1.5 pl-4 list-decimal">
+                        <li>生成されたQRコードをPCの画面に表示するか、保存して共有します。</li>
+                        <li>スマホの「カメラアプリ」を開きます。</li>
+                        <li>カメラをQRコードにかざすと、上部にリンクが表示されるのでタップします。</li>
+                    </ol>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer Section -->
+    <footer class="mt-auto border-t border-slate-200 bg-white py-6">
+        <div class="max-w-5xl mx-auto px-4 text-center text-xs text-slate-500">
+            <p>© QuickQR Code Generator - 安全で高速なフロントエンドQR生成</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const urlInput = document.getElementById('url-input');
+            const pasteBtn = document.getElementById('paste-btn');
+            const generateBtn = document.getElementById('generate-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const copyUrlBtn = document.getElementById('copy-url-btn');
+            const qrcodeRawContainer = document.getElementById('qrcode-raw-container');
+            const qrFinalCanvas = document.getElementById('qr-final-canvas');
+            const qrPlaceholder = document.getElementById('qr-placeholder');
+            const qrResult = document.getElementById('qr-result');
+            const targetUrlDisplay = document.getElementById('target-url-display');
+            const urlError = document.getElementById('url-error');
+            const presetBtns = document.querySelectorAll('.preset-btn');
+            
+            // Color & Option Elements
+            const colorDarkInput = document.getElementById('color-dark');
+            const colorDarkHex = document.getElementById('color-dark-hex');
+            const colorLightInput = document.getElementById('color-light');
+            const colorLightHex = document.getElementById('color-light-hex');
+            const qrSizeSelect = document.getElementById('qr-size');
+
+            // Icon Customization Elements
+            const presetIconBtns = document.querySelectorAll('.icon-preset-btn');
+            const iconFileInput = document.getElementById('icon-file-input');
+            const uploadIconBtn = document.getElementById('upload-icon-btn');
+            const uploadedFilename = document.getElementById('uploaded-filename');
+            const removeIconBtn = document.getElementById('remove-icon-btn');
+            const iconSizeWrapper = document.getElementById('icon-size-wrapper');
+            const iconSizeRange = document.getElementById('icon-size-range');
+            const iconSizeVal = document.getElementById('icon-size-val');
+
+            let currentIconImg = null;
+            let currentPresetType = 'none';
+
+            // Sync Color Picker & Hex Text Field
+            colorDarkInput.addEventListener('input', (e) => colorDarkHex.value = e.target.value.toUpperCase());
+            colorDarkHex.addEventListener('input', (e) => {
+                if(/^#[0-9A-F]{6}$/i.test(e.target.value)) colorDarkInput.value = e.target.value;
+            });
+            colorLightInput.addEventListener('input', (e) => colorLightHex.value = e.target.value.toUpperCase());
+            colorLightHex.addEventListener('input', (e) => {
+                if(/^#[0-9A-F]{6}$/i.test(e.target.value)) colorLightInput.value = e.target.value;
+            });
+
+            // Handle Icon Presets Selection
+            presetIconBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    presetIconBtns.forEach(b => {
+                        b.classList.remove('active', 'border-brand-500', 'text-brand-600', 'font-medium', 'shadow-sm');
+                        b.classList.add('border-slate-200', 'text-slate-700');
+                    });
+                    btn.classList.add('active', 'border-brand-500', 'text-brand-600', 'font-medium', 'shadow-sm');
+                    btn.classList.remove('border-slate-200', 'text-slate-700');
+
+                    const iconType = btn.getAttribute('data-icon');
+                    currentPresetType = iconType;
+                    
+                    // Clear uploaded file when selecting preset
+                    iconFileInput.value = '';
+                    uploadedFilename.textContent = 'ファイル未選択';
+                    removeIconBtn.classList.add('hidden');
+
+                    if (iconType === 'none') {
+                        currentIconImg = null;
+                        iconSizeWrapper.classList.add('hidden');
+                    } else {
+                        loadPresetIconImage(iconType);
+                        iconSizeWrapper.classList.remove('hidden');
+                    }
+
+                    if (!qrResult.classList.contains('hidden')) {
+                        generateQRCode();
+                    }
+                });
+            });
+
+            // Generate Preset SVG Image Data URL
+            function loadPresetIconImage(type) {
+                const color = encodeURIComponent(colorDarkInput.value || '#000000');
+                let svgString = '';
+
+                switch(type) {
+                    case 'globe':
+                        svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="${colorDarkInput.value}"><path d="M512 256C512 397.4 397.4 512 256 512C114.6 512 0 397.4 0 256C0 114.6 114.6 0 256 0C397.4 0 512 114.6 512 256zM256 48c-29.1 0-57 4.9-82.7 13.7C197.8 95.6 216 142.1 216 192l0 16c0 13.3-10.7 24-24 24l-48 0c-13.3 0-24-10.7-24-24l0-17.7c-25.2 26-42.5 59.7-48.4 97.7L184 288c13.3 0 24 10.7 24 24l0 48c0 13.3 10.7 24 24 24l32 0c13.3 0 24 10.7 24 24l0 45.4c8-.9 15.9-2.3 23.7-4.2c-5.8-21.7-18.7-60.8-59.7-89.2c-7.4-5.1-12-13.6-12-22.7l0-17.3c0-15.5 12.5-28 28-28l19.5 0c15.5 0 28-12.5 28-28l0-2.5c0-11.4 6.9-21.6 17.5-25.8l27.1-10.8c11.4-4.6 18.9-15.6 18.9-27.9l0-13.7c0-11.3-6.4-21.7-16.5-26.7l-26.1-13.1c-9.9-5-16.2-15.1-16.2-26.2l0-8.9c0-11.2-6.3-21.4-16.3-26.4L256 48z"/></svg>`;
+                        break;
+                    case 'mobile':
+                        svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" fill="${colorDarkInput.value}"><path d="M16 64C16 28.7 44.7 0 80 0L304 0c35.3 0 64 28.7 64 64l0 384c0 35.3-28.7 64-64 64L80 512c-35.3 0-64-28.7-64-64L16 64zm224 400a32 32 0 1 0 -64 0 32 32 0 1 0 64 0zM64 80l0 320 256 0 0-320L64 80z"/></svg>`;
+                        break;
+                    case 'heart':
+                        svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="#ef4444"><path d="M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8c0-69.9-50.5-129.5-119.4-141-61.2-10.2-122 13.9-156.6 62.1C201.4 58 140.6 33.9 79.4 44.1 10.5 55.6-40 115.2-40 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z"/></svg>`;
+                        break;
+                    case 'star':
+                        svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" fill="#f59e0b"><path d="M316.9 18C311.6 7 300.4 0 288.1 0s-23.5 7-28.8 18L195 150.3 47.9 171.5c-12.1 1.8-22.1 10.2-25.7 21.7s-.7 24.2 7.9 32.6L136.3 329 111.1 475.6c-2.1 12.3 3 24.5 13 31.8s23.3 7.8 34.1 2.3L288 439.8l129.8 69.9c10.8 5.5 24.1 4.9 34.1-2.3s15.1-19.5 13-31.8L439.8 329l106.3-103.2c8.6-8.4 11.5-21.1 7.9-32.6s-13.6-19.9-25.7-21.7L405.1 150.3 316.9 18z"/></svg>`;
+                        break;
+                    case 'link':
+                        svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" fill="${colorDarkInput.value}"><path d="M579.8 267.7c56.5-56.5 56.5-148 0-204.5c-50-50-128.8-53-182-7l-100 100c-35 35-46.4 85.3-34.4 130.4l57-57c-2.5-12.7 1.8-26.1 11.4-35.7l100-100c25-25 65.5-25 90.5 0c25 25 25 65.5 0 90.5l-57 57c23.6 15.7 44.7 35.1 62.5 57.8zm-226 85.7c-56.5 56.5-56.5 148 0 204.5c50 50 128.8 53 182 7l100-100c35-35 46.4-85.3 34.4-130.4l-57 57c2.5 12.7-1.8 26.1-11.4 35.7l-100 100c-25 25-65.5 25-90.5 0c-25-25-25-65.5 0-90.5l57-57c-23.6-15.7-44.7-35.1-62.5-57.8z"/></svg>`;
+                        break;
+                }
+
+                const img = new Image();
+                img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+                img.onload = () => {
+                    currentIconImg = img;
+                    if (!qrResult.classList.contains('hidden')) {
+                        generateQRCode();
+                    }
+                };
+            }
+
+            // Upload Local Image File
+            uploadIconBtn.addEventListener('click', () => iconFileInput.click());
+
+            iconFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (!file.type.startsWith('image/')) {
+                    showToast('画像ファイルを選択してください', false);
+                    return;
+                }
+
+                uploadedFilename.textContent = file.name;
+                removeIconBtn.classList.remove('hidden');
+
+                // Deselect preset icons
+                presetIconBtns.forEach(b => {
+                    b.classList.remove('active', 'border-brand-500', 'text-brand-600', 'font-medium', 'shadow-sm');
+                    b.classList.add('border-slate-200', 'text-slate-700');
+                });
+                currentPresetType = 'custom';
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        currentIconImg = img;
+                        iconSizeWrapper.classList.remove('hidden');
+                        if (!qrResult.classList.contains('hidden')) {
+                            generateQRCode();
+                        }
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // Remove Custom Icon
+            removeIconBtn.addEventListener('click', () => {
+                iconFileInput.value = '';
+                uploadedFilename.textContent = 'ファイル未選択';
+                removeIconBtn.classList.add('hidden');
+                currentIconImg = null;
+                iconSizeWrapper.classList.add('hidden');
+
+                // Set "none" active
+                presetIconBtns[0].click();
+            });
+
+            // Slider Size Change
+            iconSizeRange.addEventListener('input', (e) => {
+                iconSizeVal.textContent = `${e.target.value}%`;
+                if (!qrResult.classList.contains('hidden')) {
+                    generateQRCode();
+                }
+            });
+
+            // Toast Message Function
+            function showToast(message, isSuccess = true) {
+                const toast = document.getElementById('toast');
+                const toastMessage = document.getElementById('toast-message');
+                const toastIcon = document.getElementById('toast-icon');
+
+                toastMessage.textContent = message;
+                if(isSuccess) {
+                    toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+                } else {
+                    toastIcon.className = "fa-solid fa-triangle-exclamation text-rose-400 text-lg";
+                }
+
+                toast.classList.remove('translate-y-[-150%]', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                    toast.classList.add('translate-y-[-150%]', 'opacity-0');
+                }, 3000);
+            }
+
+            // URL Validation
+            function isValidURL(string) {
+                try {
+                    const url = new URL(string);
+                    return url.protocol === "http:" || url.protocol === "https:";
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            // Auto-format URL (add https:// if missing)
+            function formatURL(input) {
+                let trimmed = input.trim();
+                if (!trimmed) return '';
+                if (!/^https?:\/\//i.test(trimmed)) {
+                    trimmed = 'https://' + trimmed;
+                }
+                return trimmed;
+            }
+
+            // Generate QR Code with Centered Icon
+            function generateQRCode() {
+                const rawUrl = urlInput.value;
+                const formattedUrl = formatURL(rawUrl);
+
+                if (!formattedUrl || !isValidURL(formattedUrl)) {
+                    urlError.classList.remove('hidden');
+                    urlInput.classList.add('border-rose-500', 'bg-rose-50/50');
+                    showToast('有効なURLを入力してください', false);
+                    return;
+                }
+
+                // Clear previous errors
+                urlError.classList.add('hidden');
+                urlInput.classList.remove('border-rose-500', 'bg-rose-50/50');
+
+                // Update Input with formatted URL if modified
+                urlInput.value = formattedUrl;
+
+                // Clear temporary raw container
+                qrcodeRawContainer.innerHTML = '';
+
+                const size = parseInt(qrSizeSelect.value, 10);
+                const colorDark = colorDarkInput.value;
+                const colorLight = colorLightInput.value;
+
+                try {
+                    // Create base QR Code using QRCode.js
+                    new QRCode(qrcodeRawContainer, {
+                        text: formattedUrl,
+                        width: size,
+                        height: size,
+                        colorDark: colorDark,
+                        colorLight: colorLight,
+                        correctLevel: QRCode.CorrectLevel.H // High error correction level for icon overlay
+                    });
+
+                    // Wait briefly for QRCode.js to render canvas/img
+                    setTimeout(() => {
+                        renderFinalCanvas(size, colorLight);
+                    }, 50);
+
+                    // Update UI Display
+                    targetUrlDisplay.textContent = formattedUrl;
+                    qrPlaceholder.classList.add('hidden');
+                    qrResult.classList.remove('hidden');
+                    qrResult.classList.add('flex');
+
+                } catch (err) {
+                    showToast('QRコードの生成に失敗しました', false);
+                    console.error(err);
+                }
+            }
+
+            // Merge QR Code and Centered Icon onto Final Canvas
+            function renderFinalCanvas(size, bgHexColor) {
+                const rawCanvas = qrcodeRawContainer.querySelector('canvas');
+                const rawImg = qrcodeRawContainer.querySelector('img');
+
+                qrFinalCanvas.width = size;
+                qrFinalCanvas.height = size;
+                const ctx = qrFinalCanvas.getContext('2d');
+
+                const drawBaseQR = (source) => {
+                    ctx.drawImage(source, 0, 0, size, size);
+
+                    // Overlay icon if provided
+                    if (currentIconImg) {
+                        const scalePercent = parseInt(iconSizeRange.value, 10) / 100;
+                        const iconContainerSize = size * scalePercent;
+                        const iconPadding = iconContainerSize * 0.15;
+                        const iconDrawSize = iconContainerSize - (iconPadding * 2);
+                        const center = size / 2;
+                        const x = center - (iconContainerSize / 2);
+                        const y = center - (iconContainerSize / 2);
+
+                        // Draw rounded white background container for readable QR scanning
+                        ctx.save();
+                        ctx.fillStyle = bgHexColor || '#ffffff';
+                        ctx.shadowColor = 'rgba(0,0,0,0.15)';
+                        ctx.shadowBlur = size * 0.02;
+                        
+                        const cornerRadius = iconContainerSize * 0.25;
+                        ctx.beginPath();
+                        ctx.roundRect(x, y, iconContainerSize, iconContainerSize, cornerRadius);
+                        ctx.fill();
+                        ctx.restore();
+
+                        // Draw Icon in center
+                        ctx.drawImage(
+                            currentIconImg, 
+                            x + iconPadding, 
+                            y + iconPadding, 
+                            iconDrawSize, 
+                            iconDrawSize
+                        );
+                    }
+                };
+
+                if (rawCanvas) {
+                    drawBaseQR(rawCanvas);
+                } else if (rawImg && rawImg.src) {
+                    const tempImg = new Image();
+                    tempImg.onload = () => drawBaseQR(tempImg);
+                    tempImg.src = rawImg.src;
+                }
+            }
+
+            // Download Combined QR Code Image
+            function downloadQRCode() {
+                const imageSrc = qrFinalCanvas.toDataURL("image/png");
+                if (!imageSrc) {
+                    showToast('画像の取得に失敗しました', false);
+                    return;
+                }
+
+                const link = document.createElement('a');
+                link.href = imageSrc;
+                link.download = `qrcode_${Date.now()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showToast('アイコン付きQRコードを保存しました');
+            }
+
+            // Paste from Clipboard
+            async function pasteFromClipboard() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) {
+                        urlInput.value = text;
+                        generateQRCode();
+                    }
+                } catch (err) {
+                    showToast('クリップボードの読み取りに失敗しました', false);
+                }
+            }
+
+            // Event Listeners
+            generateBtn.addEventListener('click', () => {
+                generateQRCode();
+                showToast('QRコードを更新しました！');
+            });
+
+            // Press Enter to generate
+            urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    generateQRCode();
+                    showToast('QRコードを生成しました！');
+                }
+            });
+
+            // Live clear input error on typing
+            urlInput.addEventListener('input', () => {
+                if (urlError.classList.contains('hidden') === false) {
+                    urlError.classList.add('hidden');
+                    urlInput.classList.remove('border-rose-500', 'bg-rose-50/50');
+                }
+            });
+
+            // Reset Form
+            clearBtn.addEventListener('click', () => {
+                urlInput.value = '';
+                qrcodeRawContainer.innerHTML = '';
+                const ctx = qrFinalCanvas.getContext('2d');
+                ctx.clearRect(0, 0, qrFinalCanvas.width, qrFinalCanvas.height);
+                
+                urlError.classList.add('hidden');
+                urlInput.classList.remove('border-rose-500', 'bg-rose-50/50');
+                qrResult.classList.add('hidden');
+                qrResult.classList.remove('flex');
+                qrPlaceholder.classList.remove('hidden');
+                
+                colorDarkInput.value = "#000000";
+                colorDarkHex.value = "#000000";
+                colorLightInput.value = "#ffffff";
+                colorLightHex.value = "#FFFFFF";
+                
+                presetIconBtns[0].click(); // Reset to no icon
+                showToast('入力内容をリセットしました');
+            });
+
+            // Download Button
+            downloadBtn.addEventListener('click', downloadQRCode);
+
+            // Paste Button
+            pasteBtn.addEventListener('click', pasteFromClipboard);
+
+            // Copy Target URL Button
+            copyUrlBtn.addEventListener('click', () => {
+                const url = targetUrlDisplay.textContent;
+                if (!url) return;
+                
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = url;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+
+                showToast('URLをクリップボードにコピーしました');
+            });
+
+            // Preset Buttons Click Handler
+            presetBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const url = btn.getAttribute('data-url');
+                    urlInput.value = url;
+                    generateQRCode();
+                    showToast('QRコードを生成しました！');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
